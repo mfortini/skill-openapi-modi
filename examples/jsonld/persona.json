@@ -1,0 +1,33 @@
+{
+  "id": "https://api.comune.example.gov.it/persone/RSSMRA85M01H501U",
+  "codice-fiscale": "RSSMRA85M01H501U",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "data-nascita": "1985-08-01",
+  "luogo-nascita": {
+    "nome": "Roma",
+    "codice-istat": "058091",
+    "provincia": "RM"
+  },
+  "residenza": {
+    "via": "Via Roma",
+    "numero-civico": "123/A",
+    "cap": "00100",
+    "comune": {
+      "nome": "Roma",
+      "codice-istat": "058091",
+      "provincia": "RM"
+    },
+    "provincia": "RM",
+    "regione": "Lazio",
+    "coordinate": {
+      "latitudine": 41.9028,
+      "longitudine": 12.4964
+    }
+  },
+  "cittadinanza": "IT",
+  "sesso": "M",
+  "stato-civile": "CELIBE_NUBILE",
+  "email": "mario.rossi@example.com",
+  "telefono": "+39 345 1234567"
+}

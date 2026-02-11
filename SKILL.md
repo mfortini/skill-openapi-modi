@@ -116,12 +116,31 @@ FASE 5: ITERAZIONE
 → Ri-valida con oas-checker-mcp
 → Raffina annotazioni semantiche
 
-FASE 6: GENERAZIONE LOG.md
+FASE 6: GENERAZIONE ESEMPI JSON-LD
+→ Per ogni schema con annotazioni x-jsonld-*, genera due file nella cartella jsonld/:
+  - {schema}.json: Risposta JSON standard (application/json)
+  - {schema}.jsonld: Risposta JSON-LD con @context espanso (application/ld+json)
+→ Il @context nel file .jsonld DEVE includere tutti i prefissi e mappature
+→ Se lo schema NON ha mappature semantiche, usare @context vuoto: {}
+→ I file devono essere validi JSON e validabili con tool JSON-LD
+→ Documentare gap semantici: proprietà nel .json che non appaiono nel .jsonld
+
+FASE 6.5: VALIDAZIONE ESEMPI JSON-LD
+→ Validare OGNI file .jsonld con tool JSON-LD lint
+→ Comandi di validazione:
+  - jsonld-cli: `jsonld format file.jsonld` (verifica parsing)
+  - Python pyld: `python -c "from pyld import jsonld; import json; jsonld.expand(json.load(open('file.jsonld')))"`
+  - Online: https://json-ld.org/playground/
+→ Verificare che l'espansione produca URI valide
+→ Segnalare errori di sintassi o prefissi non definiti
+
+FASE 7: GENERAZIONE LOG.md
 → Genera LOG.md nella stessa directory del file OpenAPI
 → Documenta: fasi completate, decisioni di design, report semantico
 → Elenca: mappature verificate, gap identificati, vocabolari usati
 → Include: istruzioni operative per ampliare/modificare le semantiche
 → Include: storico modifiche per tracciare l'evoluzione
+→ Include: lista file JSON-LD generati con stato validazione
 ```
 
 ## Struttura del Documento OpenAPI
@@ -499,6 +518,30 @@ Il contesto JSON-LD mappa le proprietà a URI di ontologie. **Usare SEMPRE prefi
 3. Impostare `@base` sull'URL base delle risorse
 4. Mappare ogni proprietà con notazione `prefisso:nome`
 5. **Mai inserire URI complete** nelle mappature delle proprietà
+6. **@context vuoto**: Se non ci sono mappature semantiche, usare `"@context": {}`
+
+**REGOLA CRITICA - @context vuoto per schemi senza semantica**:
+Quando uno schema non ha corrispondenze ontologiche (es. `/status`, errori generici, metriche tecniche), il `@context` DEVE essere un oggetto vuoto `{}`. **Mai omettere @context**, altrimenti il JSON-LD non è valido.
+
+```yaml
+# Schema SENZA semantica mappabile - USARE @context vuoto
+StatusResponse:
+  type: object
+  x-jsonld-context: {}  # Context vuoto - valido JSON-LD
+  properties:
+    status: {type: string}
+    version: {type: string}
+    uptime: {type: integer}
+```
+
+Il JSON-LD risultante sarà:
+```json
+{
+  "@context": {},
+  "status": "healthy",
+  "version": "1.0.0"
+}
+```
 
 ```yaml
 components:
@@ -2207,6 +2250,147 @@ Suggerire all'utente di validare con:
 - [Pattern di Sicurezza](https://www.agid.gov.it/sites/agid/files/2024-05/linee_guida_tecnologie_e_standard_sicurezza_interoperabilit_api_sistemi_informatici.pdf)
 - [RFC 7807 - Problem Details](https://www.rfc-editor.org/rfc/rfc7807)
 - [Vocabolari Controllati AgID](https://github.com/italia/daf-ontologie-vocabolari-controllati)
+
+## Generazione e Validazione Esempi JSON-LD
+
+Questa sezione descrive come generare file di esempio JSON e JSON-LD per mostrare la mappatura semantica e come validarli.
+
+### Struttura cartella esempi
+
+Per ogni specifica OpenAPI, creare una cartella `jsonld/` con i file di esempio:
+
+```
+api-spec.yaml
+jsonld/
+├── README.md           # Documentazione mappature
+├── persona.json        # Risposta JSON standard
+├── persona.jsonld      # Risposta JSON-LD con @context
+├── documento.json
+├── documento.jsonld
+├── status.json         # Schema senza semantica
+└── status.jsonld       # Con @context vuoto
+```
+
+### Regole di generazione
+
+**1. Per schemi CON mappature semantiche (x-jsonld-context non vuoto):**
+
+File `.json` (application/json):
+```json
+{
+  "id": "https://api.example.gov.it/persone/RSSMRA85M01H501U",
+  "codice-fiscale": "RSSMRA85M01H501U",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "stato-civile": "CELIBE_NUBILE"
+}
+```
+
+File `.jsonld` (application/ld+json):
+```json
+{
+  "@context": {
+    "@vocab": "https://w3id.org/italia/onto/CPV/",
+    "@base": "https://api.example.gov.it/persone/",
+    "CPV": "https://w3id.org/italia/onto/CPV/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "id": "@id",
+    "codice-fiscale": { "@id": "CPV:taxCode", "@type": "xsd:string" },
+    "nome": { "@id": "CPV:givenName", "@language": "it" },
+    "cognome": { "@id": "CPV:familyName", "@language": "it" }
+  },
+  "@type": "CPV:Person",
+  "id": "https://api.example.gov.it/persone/RSSMRA85M01H501U",
+  "codice-fiscale": "RSSMRA85M01H501U",
+  "nome": "Mario",
+  "cognome": "Rossi"
+}
+```
+
+**NOTA**: Le proprietà senza mappatura semantica (es. `stato-civile`) NON appaiono nel file `.jsonld`. Documentare questi gap nel README.
+
+**2. Per schemi SENZA mappature semantiche (x-jsonld-context vuoto):**
+
+```json
+{
+  "@context": {},
+  "status": "healthy",
+  "version": "1.0.0"
+}
+```
+
+**REGOLA CRITICA**: Mai omettere `@context`. Usare oggetto vuoto `{}` per schemi senza semantica.
+
+### Validazione JSON-LD
+
+Validare OGNI file `.jsonld` prima del commit. Usare uno dei seguenti tool:
+
+**1. jsonld-cli (Node.js) - RACCOMANDATO**
+
+```bash
+# Installazione
+npm install -g jsonld-cli
+
+# Validazione formato
+jsonld format persona.jsonld
+
+# Espansione (verifica URI)
+jsonld expand persona.jsonld
+
+# Compattazione con context esterno
+jsonld compact -c context.jsonld persona.jsonld
+```
+
+**2. pyld (Python)**
+
+```bash
+# Installazione
+pip install pyld
+
+# Script di validazione
+python << 'EOF'
+from pyld import jsonld
+import json
+import sys
+
+try:
+    with open('persona.jsonld') as f:
+        doc = json.load(f)
+    expanded = jsonld.expand(doc)
+    print("✓ JSON-LD valido")
+    print(f"  Espanso in {len(expanded)} nodi")
+except Exception as e:
+    print(f"✗ Errore: {e}")
+    sys.exit(1)
+EOF
+```
+
+**3. JSON-LD Playground (online)**
+
+- URL: https://json-ld.org/playground/
+- Incollare il contenuto del file `.jsonld`
+- Verificare che "Expanded" mostri le URI complete
+- Controllare che non ci siano errori in console
+
+### Checklist validazione
+
+Per ogni file `.jsonld`:
+
+- [ ] Il file è JSON valido (nessun errore di sintassi)
+- [ ] `@context` è presente (anche se vuoto `{}`)
+- [ ] Tutti i prefissi usati sono definiti nel context
+- [ ] L'espansione produce URI valide (non literal con prefisso non risolto)
+- [ ] `@type` è presente per le entità principali
+- [ ] Gap semantici documentati nel README
+
+### Errori comuni
+
+| Errore | Causa | Soluzione |
+|--------|-------|-----------|
+| `undefined:property` nell'espansione | Prefisso non definito | Aggiungere prefisso al @context |
+| `@context` mancante | File non è JSON-LD valido | Aggiungere `"@context": {}` |
+| URI non espanse | Prefisso con errore di battitura | Verificare spelling prefissi |
+| `@vocab` non funziona | Sintassi errata | Usare formato `"@vocab": "https://..."` |
 
 ## Registro Correzioni Semantiche
 

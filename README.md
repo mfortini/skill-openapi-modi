@@ -158,14 +158,25 @@ Valida la specifica generata con:
 ## Struttura della Skill
 
 ```
-openapi-agid-skill/
+skill-openapi-modi/
 ├── SKILL.md                      # Guida completa con workflow MCP
 ├── README.md                     # Questo file
-├── QUICK_REFERENCE.md            # Guida rapida pattern comuni
 ├── API_DESIGN_CANVAS.md          # Template canvas progettazione
-├── MCP_INTEGRATION_GUIDE.md     # Guida uso tool MCP
+├── MCP_INTEGRATION_GUIDE.md      # Guida uso tool MCP
 └── examples/
-    └── esempio-completo.yaml     # Esempio con annotazioni semantiche
+    ├── README.md                 # Guida agli esempi
+    ├── template-minimal.yaml     # Template base per iniziare
+    ├── esempio-completo.yaml     # API CRUD completa
+    ├── esempio-semantico.yaml    # Con annotazioni JSON-LD
+    ├── esempio-asincrono.yaml    # Pattern asincrono
+    └── jsonld/                   # Esempi mappatura JSON-LD
+        ├── README.md             # Documentazione mappature
+        ├── persona.json          # Risposta JSON standard
+        ├── persona.jsonld        # Con @context (CPV:Person)
+        ├── documento.json        # Documento JSON
+        ├── documento.jsonld      # Con @context (dcat:Dataset)
+        ├── status.json           # Health check JSON
+        └── status.jsonld         # Con @context vuoto {}
 ```
 
 ## Novità Versione 2.0
@@ -198,13 +209,28 @@ Template strutturato per progettare l'API prima di scrivere codice:
 ✅ Valida mappature semantiche
 ```
 
-### 📋 Workflow Completo 5 Fasi
+### 📋 Workflow Completo 7 Fasi
 
 1. **PROGETTAZIONE** → Canvas API con stakeholder
 2. **GENERAZIONE** → Specifica OpenAPI da canvas
 3. **ARRICCHIMENTO** → Ontologie con dati-semantic-mcp
-4. **VALIDAZIONE** → Conformità con oas-checker-mcp
-5. **ITERAZIONE** → Fix problemi fino a 95+ score
+4. **VALIDAZIONE SEMANTICA** → Verifica URI via MCP (FASE 3.5)
+5. **VALIDAZIONE ModI** → Conformità con oas-checker-mcp
+6. **ESEMPI JSON-LD** → Genera file .json e .jsonld per ogni schema
+7. **ITERAZIONE** → Fix problemi fino a 95+ score
+
+### 📦 Esempi JSON-LD
+
+Nuova cartella `examples/jsonld/` con file di esempio per:
+- Visualizzare la mappatura JSON → JSON-LD
+- Gestire schemi senza semantica (`@context: {}`)
+- Validare con tool JSON-LD lint
+
+```bash
+# Validazione esempi
+npm install -g jsonld-cli
+jsonld format examples/jsonld/persona.jsonld
+```
 
 Vedi `MCP_INTEGRATION_GUIDE.md` per dettagli completi.
 

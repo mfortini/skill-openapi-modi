@@ -1,0 +1,54 @@
+{
+  "@context": {
+    "@base": "https://api.comune.example.gov.it/documenti/",
+    "dct": "http://purl.org/dc/terms/",
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "COV": "https://w3id.org/italia/onto/COV/",
+    "CPV": "https://w3id.org/italia/onto/CPV/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "id": "@id",
+    "type": "@type",
+
+    "identificativo": "dct:identifier",
+    "titolo": "dct:title",
+    "descrizione": "dct:description",
+    "tipo": "dct:type",
+    "formato": "dct:format",
+    "data-creazione": {
+      "@id": "dct:created",
+      "@type": "xsd:date"
+    },
+    "data-modifica": {
+      "@id": "dct:modified",
+      "@type": "xsd:date"
+    },
+    "autore": {
+      "@id": "dct:creator",
+      "@type": "@id"
+    },
+    "classificazione": {
+      "@id": "CPV:hasClassification",
+      "@type": "@id"
+    }
+  },
+
+  "@type": "dcat:Dataset",
+  "id": "https://api.comune.example.gov.it/documenti/DOC-2025-001234",
+  "identificativo": "DOC-2025-001234",
+  "titolo": "Autorizzazione edilizia",
+  "descrizione": "Autorizzazione per ristrutturazione immobile",
+  "tipo": "AUTORIZZAZIONE",
+  "formato": "application/pdf",
+  "data-creazione": "2025-01-15",
+  "data-modifica": "2025-02-10",
+  "autore": {
+    "@type": "COV:Organization",
+    "COV:legalName": "Ufficio Tecnico",
+    "COV:IPAcode": "c_h501"
+  },
+  "classificazione": {
+    "dct:identifier": "VI.3",
+    "dct:description": "Edilizia privata"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "@context": {
+    "@vocab": "https://w3id.org/italia/onto/CPV/",
+    "@base": "https://api.comune.example.gov.it/persone/",
+    "CPV": "https://w3id.org/italia/onto/CPV/",
+    "CLV": "https://w3id.org/italia/onto/CLV/",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "geo": "http://www.w3.org/2003/01/geo/wgs84_pos#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "id": "@id",
+    "type": "@type",
+
+    "codice-fiscale": {
+      "@id": "CPV:taxCode",
+      "@type": "xsd:string"
+    },
+    "nome": {
+      "@id": "CPV:givenName",
+      "@language": "it"
+    },
+    "cognome": {
+      "@id": "CPV:familyName",
+      "@language": "it"
+    },
+    "data-nascita": {
+      "@id": "CPV:dateOfBirth",
+      "@type": "xsd:date"
+    },
+    "luogo-nascita": {
+      "@id": "CPV:hasBirthPlace",
+      "@type": "@id"
+    },
+    "residenza": {
+      "@id": "CPV:hasResidenceInTime",
+      "@type": "@id"
+    },
+    "cittadinanza": {
+      "@id": "CPV:hasCitizenship",
+      "@type": "@id"
+    },
+    "sesso": {
+      "@id": "CPV:hasSex",
+      "@type": "@id"
+    },
+    "email": {
+      "@id": "foaf:mbox",
+      "@type": "xsd:string"
+    },
+    "telefono": {
+      "@id": "foaf:phone",
+      "@type": "xsd:string"
+    },
+
+    "via": "CLV:fullAddress",
+    "numero-civico": {
+      "@id": "CLV:hasNumber",
+      "@type": "@id"
+    },
+    "comune": {
+      "@id": "CLV:hasCity",
+      "@type": "@id"
+    },
+    "provincia": {
+      "@id": "CLV:hasProvince",
+      "@type": "@id"
+    },
+    "regione": {
+      "@id": "CLV:hasRegion",
+      "@type": "@id"
+    },
+    "coordinate": {
+      "@id": "CLV:hasGeometry",
+      "@type": "@id"
+    },
+    "latitudine": "geo:lat",
+    "longitudine": "geo:long",
+
+    "codice-istat": {
+      "@id": "CLV:hasIdentifier",
+      "@type": "@id"
+    }
+  },
+
+  "@type": "CPV:Person",
+  "id": "https://api.comune.example.gov.it/persone/RSSMRA85M01H501U",
+  "codice-fiscale": "RSSMRA85M01H501U",
+  "nome": "Mario",
+  "cognome": "Rossi",
+  "data-nascita": "1985-08-01",
+  "luogo-nascita": {
+    "@type": "CLV:City",
+    "rdfs:label": "Roma",
+    "codice-istat": "058091",
+    "provincia": "RM"
+  },
+  "residenza": {
+    "@type": "CLV:Address",
+    "via": "Via Roma",
+    "numero-civico": "123/A",
+    "comune": {
+      "@type": "CLV:City",
+      "rdfs:label": "Roma",
+      "codice-istat": "058091",
+      "provincia": "RM"
+    },
+    "provincia": "RM",
+    "regione": "Lazio",
+    "coordinate": {
+      "@type": "geo:Point",
+      "latitudine": 41.9028,
+      "longitudine": 12.4964
+    }
+  },
+  "cittadinanza": "IT",
+  "sesso": "M",
+  "email": "mario.rossi@example.com",
+  "telefono": "+39 345 1234567"
+}

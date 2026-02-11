@@ -116,6 +116,38 @@ Questa cartella contiene esempi progressivi di specifiche OpenAPI conformi alle 
 
 ---
 
+### 5. Cartella `jsonld/` - Esempi Mappatura Semantica
+**Livello**: Avanzato
+**Cosa include**:
+- File `.json` (risposta standard application/json)
+- File `.jsonld` (risposta con @context application/ld+json)
+- README con documentazione mappature e gap semantici
+
+**File disponibili**:
+| JSON | JSON-LD | Entità | Note |
+|------|---------|--------|------|
+| `persona.json` | `persona.jsonld` | CPV:Person | Mappatura completa con gap documentati |
+| `documento.json` | `documento.jsonld` | dcat:Dataset | Dublin Core + DCAT |
+| `status.json` | `status.jsonld` | - | **@context vuoto** (nessuna semantica) |
+
+**Quando usare**:
+- Comprendere la differenza tra JSON e JSON-LD
+- Vedere come i gap semantici vengono gestiti
+- Validare file JSON-LD prima del deploy
+
+**Validazione**:
+```bash
+# Con jsonld-cli
+npm install -g jsonld-cli
+jsonld format jsonld/persona.jsonld
+
+# Con pyld
+pip install pyld
+python -c "from pyld import jsonld; import json; print(jsonld.expand(json.load(open('jsonld/persona.jsonld'))))"
+```
+
+---
+
 ## 🎯 Percorso di Apprendimento
 
 ### Livello 1: Fondamenti
@@ -212,19 +244,21 @@ openapi-generator-cli generate \
 
 ## 📊 Confronto Esempi
 
-| Caratteristica | Minimal | Completo | Semantico | Asincrono |
-|----------------|---------|----------|-----------|-----------|
-| **Righe YAML** | ~200 | ~800 | ~350 | ~450 |
-| **Complessità** | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Endpoints** | 1 | 8+ | 2 | 4 |
-| **CRUD** | ❌ | ✅ | ❌ | ❌ |
-| **Paginazione** | ❌ | ✅ | ❌ | ❌ |
-| **Upload File** | ❌ | ✅ | ❌ | ❌ |
-| **JSON-LD** | ❌ | ❌ | ✅ | ❌ |
-| **Ontologie** | ❌ | ❌ | ✅ | ❌ |
-| **Operazioni Async** | ❌ | ❌ | ❌ | ✅ |
-| **Pattern ModI** | Base | BLOCK_REST | BLOCK_REST + Semantico | NONBLOCK_REST_PULL |
-| **Score OAS-Checker** | 85-90% | 95%+ | 95%+ | 95%+ |
+| Caratteristica | Minimal | Completo | Semantico | Asincrono | jsonld/ |
+|----------------|---------|----------|-----------|-----------|---------|
+| **Tipo File** | YAML | YAML | YAML | YAML | JSON/JSON-LD |
+| **Righe** | ~200 | ~800 | ~350 | ~450 | 5 file |
+| **Complessità** | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **Endpoints** | 1 | 8+ | 2 | 4 | - |
+| **CRUD** | ❌ | ✅ | ❌ | ❌ | - |
+| **Paginazione** | ❌ | ✅ | ❌ | ❌ | - |
+| **Upload File** | ❌ | ✅ | ❌ | ❌ | - |
+| **JSON-LD** | ❌ | ❌ | ✅ | ❌ | ✅ |
+| **@context vuoto** | - | - | - | - | ✅ |
+| **Ontologie** | ❌ | ❌ | ✅ | ❌ | ✅ |
+| **Operazioni Async** | ❌ | ❌ | ❌ | ✅ | - |
+| **Pattern ModI** | Base | BLOCK_REST | BLOCK_REST + Semantico | NONBLOCK_REST_PULL | - |
+| **Score OAS-Checker** | 85-90% | 95%+ | 95%+ | 95%+ | - |
 
 ---
 
@@ -280,6 +314,9 @@ Prima di usare in produzione:
 - [ ] Health check funzionante
 - [ ] **Tutte le URI ontologiche verificate via MCP** (FASE 3.5)
 - [ ] Gap semantici documentati nelle description
+- [ ] **File JSON-LD generati** per ogni schema con annotazioni semantiche
+- [ ] **File JSON-LD validati** con jsonld-cli o pyld
+- [ ] **@context vuoto** usato per schemi senza semantica (mai omesso)
 - [ ] Mock server testato
 - [ ] Client generato e validato
 - [ ] Documentazione pubblicata

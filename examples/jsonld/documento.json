@@ -1,0 +1,19 @@
+{
+  "id": "https://api.comune.example.gov.it/documenti/DOC-2025-001234",
+  "identificativo": "DOC-2025-001234",
+  "titolo": "Autorizzazione edilizia",
+  "descrizione": "Autorizzazione per ristrutturazione immobile",
+  "tipo": "AUTORIZZAZIONE",
+  "formato": "application/pdf",
+  "data-creazione": "2025-01-15",
+  "data-modifica": "2025-02-10",
+  "autore": {
+    "nome": "Ufficio Tecnico",
+    "codice-ipa": "c_h501"
+  },
+  "classificazione": {
+    "codice": "VI.3",
+    "descrizione": "Edilizia privata"
+  },
+  "stato": "PUBBLICATO"
+}
