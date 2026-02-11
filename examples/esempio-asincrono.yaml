@@ -1,0 +1,575 @@
+openapi: 3.0.3
+info:
+  title: API Elaborazioni - Pattern Asincrono
+  version: 1.0.0
+  description: |
+    Esempio di implementazione pattern NONBLOCK_REST_PULL per operazioni asincrone.
+    
+    **Quando usare operazioni asincrone:**
+    - Elaborazione richiede > 10 secondi
+    - Processi batch o long-running
+    - Integrazione con sistemi esterni lenti
+    - Elaborazioni che possono fallire e retry
+    
+    **Pattern implementato:**
+    1. POST → 202 Accepted con Location header
+    2. GET Location → stato elaborazione (IN_CORSO/COMPLETATA/ERRORE)
+    3. Polling client fino a completamento
+    4. GET risultato finale
+    
+    Conforme a: Pattern NONBLOCK_REST_PULL - ModI AgID
+  
+  contact:
+    name: Ufficio Sistemi Informativi
+    email: api@ente.gov.it
+  
+  x-api-id: ente-elaborazioni-api
+  x-summary: API con pattern asincrono NONBLOCK_REST_PULL
+
+servers:
+  - url: https://api.ente.gov.it/elaborazioni/v1
+
+tags:
+  - name: Elaborazioni
+    description: Operazioni asincrone
+    x-goal: Gestione elaborazioni long-running
+
+paths:
+  /status:
+    get:
+      summary: Health check
+      security: []
+      tags: [System]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  status: {type: string}
+
+  /calcoli-complessi:
+    post:
+      summary: Avvia calcolo complesso asincrono
+      description: |
+        Avvia un'elaborazione asincrona e ritorna immediatamente.
+        
+        **Workflow client:**
+        1. POST questo endpoint → ricevi 202 + Location
+        2. Polling GET su Location ogni 2-5 secondi
+        3. Quando stato = COMPLETATA, preleva risultato
+        4. Se stato = ERRORE, gestisci fallimento
+        
+        **Timeout:** Elaborazione max 5 minuti, poi ERRORE
+      
+      operationId: avviaCalcolo
+      tags:
+        - Elaborazioni
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RichiestaCalcolo'
+            example:
+              parametri:
+                dataset: 'anagrafe_2024'
+                operazione: 'aggregazione'
+                filtri:
+                  eta_min: 18
+                  provincia: 'RM'
+      
+      responses:
+        '202':
+          description: |
+            Elaborazione avviata con successo.
+            Usa Location header per verificare stato.
+          
+          headers:
+            Location:
+              description: URL per verificare stato elaborazione
+              required: true
+              schema:
+                type: string
+                format: uri
+              example: '/elaborazioni/550e8400-e29b-41d4-a716-446655440000'
+            
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElaborazioneAvviata'
+              example:
+                id: '550e8400-e29b-41d4-a716-446655440000'
+                stato: 'IN_CORSO'
+                link-stato: '/elaborazioni/550e8400-e29b-41d4-a716-446655440000'
+                data-avvio: '2024-02-10T14:30:00Z'
+                stima-completamento: '2024-02-10T14:35:00Z'
+        
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /elaborazioni/{id-elaborazione}:
+    parameters:
+      - name: id-elaborazione
+        in: path
+        required: true
+        description: ID elaborazione da Location header
+        schema:
+          type: string
+          format: uuid
+        example: '550e8400-e29b-41d4-a716-446655440000'
+    
+    get:
+      summary: Verifica stato elaborazione
+      description: |
+        Ritorna lo stato corrente dell'elaborazione.
+        
+        **Client deve fare polling** ogni 2-5 secondi fino a:
+        - stato = COMPLETATA → preleva risultato
+        - stato = ERRORE → gestisci fallimento
+        - stato = ANNULLATA → operazione cancellata
+        
+        **Best practice:**
+        - Intervallo polling: min 2s, max 10s
+        - Timeout client: 10 minuti
+        - Exponential backoff se errori 5xx
+      
+      operationId: getStatoElaborazione
+      tags:
+        - Elaborazioni
+      
+      responses:
+        '200':
+          description: Stato elaborazione
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            
+            Retry-After:
+              description: |
+                Secondi suggeriti prima del prossimo polling.
+                Presente solo se stato = IN_CORSO.
+              schema:
+                type: integer
+              example: 5
+          
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatoElaborazione'
+              
+              examples:
+                in-corso:
+                  summary: Elaborazione in corso
+                  value:
+                    id: '550e8400-e29b-41d4-a716-446655440000'
+                    stato: 'IN_CORSO'
+                    progresso: 45
+                    messaggio: 'Processamento record 4500/10000'
+                    data-avvio: '2024-02-10T14:30:00Z'
+                    stima-completamento: '2024-02-10T14:35:00Z'
+                
+                completata:
+                  summary: Elaborazione completata
+                  value:
+                    id: '550e8400-e29b-41d4-a716-446655440000'
+                    stato: 'COMPLETATA'
+                    progresso: 100
+                    data-avvio: '2024-02-10T14:30:00Z'
+                    data-completamento: '2024-02-10T14:33:45Z'
+                    risultato:
+                      totale-record: 10000
+                      record-validi: 9876
+                      record-scartati: 124
+                      url-download: '/elaborazioni/550e8400-e29b-41d4-a716-446655440000/risultato'
+                
+                errore:
+                  summary: Elaborazione fallita
+                  value:
+                    id: '550e8400-e29b-41d4-a716-446655440000'
+                    stato: 'ERRORE'
+                    progresso: 67
+                    data-avvio: '2024-02-10T14:30:00Z'
+                    data-errore: '2024-02-10T14:32:15Z'
+                    errore:
+                      codice: 'ERR_DATASET_NOT_FOUND'
+                      messaggio: 'Dataset "anagrafe_2024" non trovato'
+                      dettaglio: 'Verificare nome dataset e permessi accesso'
+        
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      summary: Annulla elaborazione
+      description: |
+        Annulla un'elaborazione in corso.
+        
+        **Note:**
+        - Annullamento non garantito se già in fase finale
+        - Stato diventa ANNULLATA dopo conferma
+        - Risorse allocate vengono rilasciate
+      
+      operationId: annullaElaborazione
+      tags:
+        - Elaborazioni
+      
+      responses:
+        '204':
+          description: Elaborazione annullata
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+        
+        '404':
+          $ref: '#/components/responses/NotFound'
+        
+        '409':
+          description: |
+            Impossibile annullare (già completata/annullata)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /elaborazioni/{id-elaborazione}/risultato:
+    parameters:
+      - name: id-elaborazione
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    
+    get:
+      summary: Scarica risultato elaborazione
+      description: |
+        Download risultato elaborazione completata.
+        
+        **Disponibile solo se:** stato = COMPLETATA
+        
+        **Formati supportati:**
+        - application/json: dati strutturati
+        - text/csv: export tabellare
+        - application/zip: file multipli
+      
+      operationId: downloadRisultato
+      tags:
+        - Elaborazioni
+      
+      parameters:
+        - name: formato
+          in: query
+          description: Formato output desiderato
+          schema:
+            type: string
+            enum: [json, csv, zip]
+            default: json
+      
+      responses:
+        '200':
+          description: Risultato elaborazione
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            Content-Disposition:
+              description: Nome file suggerito
+              schema:
+                type: string
+              example: 'attachment; filename="risultato_550e8400.json"'
+          
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RisultatoElaborazione'
+            
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        
+        '404':
+          description: Elaborazione non trovata o risultato non disponibile
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        
+        '410':
+          description: |
+            Risultato scaduto (retention period superato).
+            I risultati vengono conservati per 7 giorni.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    X-Request-ID:
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    RichiestaCalcolo:
+      type: object
+      description: Parametri per avviare il calcolo
+      required:
+        - parametri
+      properties:
+        parametri:
+          type: object
+          description: Parametri specifici dell'elaborazione
+          additionalProperties: true
+        
+        callback-url:
+          type: string
+          format: uri
+          description: |
+            URL opzionale per notifica push al completamento.
+            Se fornito, riceverai POST con stato finale.
+          example: 'https://client.example.com/webhook/elaborazioni'
+        
+        priorita:
+          type: string
+          enum: [BASSA, NORMALE, ALTA]
+          default: NORMALE
+          description: Priorità elaborazione (influenza coda)
+
+    ElaborazioneAvviata:
+      type: object
+      description: Conferma avvio elaborazione
+      required:
+        - id
+        - stato
+        - link-stato
+        - data-avvio
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID univoco elaborazione
+        
+        stato:
+          type: string
+          enum: [IN_CODA, IN_CORSO]
+          description: Stato iniziale
+        
+        link-stato:
+          type: string
+          format: uri-reference
+          description: URL per polling stato
+        
+        data-avvio:
+          type: string
+          format: date-time
+        
+        stima-completamento:
+          type: string
+          format: date-time
+          description: Stima (best-effort, può variare)
+
+    StatoElaborazione:
+      type: object
+      description: Stato corrente elaborazione
+      required:
+        - id
+        - stato
+        - data-avvio
+      properties:
+        id:
+          type: string
+          format: uuid
+        
+        stato:
+          type: string
+          enum:
+            - IN_CODA        # In attesa di risorse
+            - IN_CORSO       # Elaborazione attiva
+            - COMPLETATA     # Successo
+            - ERRORE         # Fallimento
+            - ANNULLATA      # Cancellata da utente
+          description: Stato elaborazione
+        
+        progresso:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Percentuale completamento (0-100)
+        
+        messaggio:
+          type: string
+          description: Descrizione stato corrente human-readable
+          example: 'Processamento 4500/10000 record'
+        
+        data-avvio:
+          type: string
+          format: date-time
+        
+        data-completamento:
+          type: string
+          format: date-time
+          description: Presente solo se COMPLETATA
+        
+        data-errore:
+          type: string
+          format: date-time
+          description: Presente solo se ERRORE
+        
+        stima-completamento:
+          type: string
+          format: date-time
+          description: Stima dinamica (aggiornata durante elaborazione)
+        
+        risultato:
+          description: Presente solo se COMPLETATA
+          type: object
+          properties:
+            url-download:
+              type: string
+              format: uri-reference
+              description: Link per scaricare risultato completo
+            
+            summary:
+              type: object
+              description: Riepilogo risultati
+              additionalProperties: true
+        
+        errore:
+          description: Presente solo se ERRORE
+          type: object
+          required:
+            - codice
+            - messaggio
+          properties:
+            codice:
+              type: string
+              description: Codice errore machine-readable
+              example: 'ERR_TIMEOUT'
+            
+            messaggio:
+              type: string
+              description: Descrizione errore human-readable
+            
+            dettaglio:
+              type: string
+              description: Info aggiuntive per troubleshooting
+            
+            retry-possibile:
+              type: boolean
+              description: true se client può riprovare
+
+    RisultatoElaborazione:
+      type: object
+      description: Risultato completo elaborazione
+      properties:
+        id-elaborazione:
+          type: string
+          format: uuid
+        
+        data-elaborazione:
+          type: string
+          format: date-time
+        
+        parametri-input:
+          type: object
+          description: Parametri usati per elaborazione
+        
+        statistiche:
+          type: object
+          description: Metriche elaborazione
+          properties:
+            durata-secondi:
+              type: integer
+            record-processati:
+              type: integer
+            record-validi:
+              type: integer
+            record-scartati:
+              type: integer
+        
+        dati:
+          type: array
+          description: Dati risultato
+          items:
+            type: object
+
+    Problem:
+      type: object
+      required: [status, title]
+      properties:
+        type: {type: string, format: uri}
+        status: {type: integer}
+        title: {type: string}
+        detail: {type: string}
+
+  responses:
+    BadRequest:
+      description: Richiesta non valida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    Unauthorized:
+      description: Non autenticato
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    NotFound:
+      description: Risorsa non trovata
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+security:
+  - bearerAuth: []
+
+# BEST PRACTICES IMPLEMENTAZIONE
+#
+# 1. Gestione Code
+#    - Priorità: ALTA > NORMALE > BASSA
+#    - Max concorrenza: es. 10 elaborazioni parallele
+#    - Timeout: max 5 minuti per elaborazione
+#
+# 2. Persistenza Stato
+#    - Salva stato in DB ogni N secondi
+#    - Permette recovery dopo crash
+#    - Mantieni log dettagliato
+#
+# 3. Notifiche Push (opzionali)
+#    - Se callback-url fornito, POST al completamento
+#    - Include stato finale e link risultato
+#    - Retry 3 volte con backoff
+#
+# 4. Retention Risultati
+#    - Conserva per 7 giorni dopo completamento
+#    - Pulizia automatica batch notturno
+#    - Notifica utente prima scadenza
+#
+# 5. Monitoring
+#    - Metriche: tempo medio, tasso successo, code depth
+#    - Alert: code troppo lunghe, timeout frequenti
+#    - Dashboard real-time per ops

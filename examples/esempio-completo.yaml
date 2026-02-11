@@ -1,0 +1,1108 @@
+openapi: 3.0.3
+info:
+  title: API Gestione Documenti Amministrativi
+  version: 1.0.0
+  description: |
+    API REST per la gestione del ciclo di vita dei documenti amministrativi
+    di un ente pubblico, conforme alle Linee Guida AgID sull'interoperabilità.
+    
+    ## Scopo
+    Questa API permette la gestione completa dei documenti amministrativi:
+    - Creazione e modifica documenti
+    - Consultazione e ricerca
+    - Gestione allegati
+    - Tracciamento delle modifiche
+    
+    ## Funzionalità Principali
+    - **CRUD Documenti**: operazioni complete sui documenti
+    - **Ricerca Avanzata**: filtri multipli e ricerca full-text
+    - **Gestione Allegati**: upload e download di file
+    - **Audit Trail**: tracciamento di tutte le operazioni
+    
+    ## Conformità
+    - Linee Guida AgID sull'interoperabilità tecnica delle PA
+    - Pattern REST bloccante (BLOCK_REST)
+    - Pattern di sicurezza ID_AUTH_REST_01 (Bearer JWT)
+    - RFC 7807 per gestione errori
+    
+    ## Documentazione Tecnica
+    - [Manuale Utente](https://docs.example.gov.it/documenti/manuale)
+    - [API Guidelines](https://docs.example.gov.it/api-guidelines)
+    
+  contact:
+    name: Ufficio Trasformazione Digitale
+    email: digitale@comune.example.gov.it
+    url: https://www.comune.example.gov.it
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://www.comune.example.gov.it/terms
+  x-api-id: comune-example-documenti-api
+  x-summary: API per gestione documenti amministrativi conformi ModI AgID
+
+servers:
+  - url: https://api.comune.example.gov.it/documenti/v1
+    description: Ambiente di produzione
+  - url: https://api-test.comune.example.gov.it/documenti/v1
+    description: Ambiente di test e sviluppo
+
+tags:
+  - name: Documenti
+    description: Operazioni sui documenti amministrativi
+    x-goal: Gestione del ciclo di vita completo dei documenti
+  - name: Allegati
+    description: Gestione dei file allegati ai documenti
+    x-goal: Upload, download e gestione degli allegati
+  - name: Ricerca
+    description: Funzionalità di ricerca e filtro
+    x-goal: Ricerca avanzata nel repository documentale
+  - name: System
+    description: Operazioni di sistema e monitoraggio
+    x-goal: Health check e informazioni sul servizio
+
+paths:
+  /status:
+    get:
+      summary: Verifica stato del servizio
+      description: |
+        Endpoint per il monitoraggio dello stato di salute del servizio.
+        Utilizzato dai sistemi di monitoring per verificare la disponibilità.
+      operationId: getStatus
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Servizio operativo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                status: OK
+                version: 1.0.0
+                timestamp: '2024-02-10T14:30:00Z'
+                checks:
+                  database: OK
+                  storage: OK
+        '503':
+          description: Servizio non disponibile
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /documenti:
+    get:
+      summary: Elenca documenti
+      description: |
+        Restituisce l'elenco dei documenti con supporto per paginazione,
+        filtri e ordinamento.
+      operationId: listDocumenti
+      tags:
+        - Documenti
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: tipo
+          in: query
+          description: Filtra per tipologia documento
+          schema:
+            $ref: '#/components/schemas/TipoDocumento'
+        - name: stato
+          in: query
+          description: Filtra per stato documento
+          schema:
+            $ref: '#/components/schemas/StatoDocumento'
+        - name: data-da
+          in: query
+          description: Filtra documenti dalla data (ISO 8601)
+          schema:
+            type: string
+            format: date
+            example: '2024-01-01'
+        - name: data-a
+          in: query
+          description: Filtra documenti fino alla data (ISO 8601)
+          schema:
+            type: string
+            format: date
+            example: '2024-12-31'
+        - name: sort
+          in: query
+          description: Campo e direzione di ordinamento (+ ascendente, - discendente)
+          schema:
+            type: string
+            enum:
+              - '+data-protocollo'
+              - '-data-protocollo'
+              - '+numero-protocollo'
+              - '-numero-protocollo'
+              - '+titolo'
+              - '-titolo'
+            default: '-data-protocollo'
+        - name: q
+          in: query
+          description: Ricerca full-text nel titolo e nella descrizione
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 100
+      responses:
+        '200':
+          description: Lista documenti recuperata con successo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            Link:
+              description: Link per navigazione paginata (first, prev, next, last)
+              schema:
+                type: string
+              example: '</documenti?offset=0&limit=20>; rel="first", </documenti?offset=20&limit=20>; rel="next"'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentiCollection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Crea nuovo documento
+      description: Crea un nuovo documento amministrativo nel sistema
+      operationId: createDocumento
+      tags:
+        - Documenti
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentoCreate'
+      responses:
+        '201':
+          description: Documento creato con successo
+          headers:
+            Location:
+              description: URL del documento creato
+              schema:
+                type: string
+                format: uri
+              example: /documenti/550e8400-e29b-41d4-a716-446655440000
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Documento'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /documenti/{id-documento}:
+    parameters:
+      - name: id-documento
+        in: path
+        required: true
+        description: Identificativo univoco del documento
+        schema:
+          type: string
+          format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    get:
+      summary: Recupera documento
+      description: Recupera i dettagli completi di un documento specifico
+      operationId: getDocumento
+      tags:
+        - Documenti
+      responses:
+        '200':
+          description: Documento recuperato con successo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            ETag:
+              description: Versione del documento per concurrency control
+              schema:
+                type: string
+              example: '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Documento'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Aggiorna documento
+      description: Aggiorna completamente un documento esistente
+      operationId: updateDocumento
+      tags:
+        - Documenti
+      parameters:
+        - name: If-Match
+          in: header
+          description: ETag per ottimistic locking
+          required: true
+          schema:
+            type: string
+          example: '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentoUpdate'
+      responses:
+        '200':
+          description: Documento aggiornato con successo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            ETag:
+              description: Nuovo ETag del documento
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Documento'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflitto - ETag non corrispondente
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Elimina documento
+      description: Elimina logicamente un documento dal sistema
+      operationId: deleteDocumento
+      tags:
+        - Documenti
+      responses:
+        '204':
+          description: Documento eliminato con successo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /documenti/{id-documento}/allegati:
+    parameters:
+      - name: id-documento
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Elenca allegati
+      description: Restituisce l'elenco degli allegati di un documento
+      operationId: listAllegati
+      tags:
+        - Allegati
+      responses:
+        '200':
+          description: Lista allegati
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Allegato'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Carica allegato
+      description: Carica un nuovo file allegato al documento
+      operationId: uploadAllegato
+      tags:
+        - Allegati
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File da caricare
+                nome:
+                  type: string
+                  description: Nome del file (opzionale, dedotto dal filename)
+                  maxLength: 255
+                descrizione:
+                  type: string
+                  description: Descrizione dell'allegato
+                  maxLength: 500
+      responses:
+        '201':
+          description: Allegato caricato con successo
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Allegato'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: File troppo grande (max 50MB)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '415':
+          description: Tipo di file non supportato
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /documenti/{id-documento}/allegati/{id-allegato}:
+    parameters:
+      - name: id-documento
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id-allegato
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Scarica allegato
+      description: Scarica il contenuto binario di un allegato
+      operationId: downloadAllegato
+      tags:
+        - Allegati
+      responses:
+        '200':
+          description: Contenuto dell'allegato
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="documento.pdf"
+            Content-Type:
+              schema:
+                type: string
+              example: application/pdf
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Elimina allegato
+      description: Elimina un allegato dal documento
+      operationId: deleteAllegato
+      tags:
+        - Allegati
+      responses:
+        '204':
+          description: Allegato eliminato con successo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ricerca:
+    post:
+      summary: Ricerca avanzata documenti
+      description: |
+        Esegue una ricerca avanzata sui documenti con criteri multipli
+        e supporto per operatori logici
+      operationId: searchDocumenti
+      tags:
+        - Ricerca
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriteriRicerca'
+      responses:
+        '200':
+          description: Risultati della ricerca
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RisultatiRicerca'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Autenticazione tramite token JWT secondo il pattern ID_AUTH_REST_01.
+        Il token deve essere incluso nell'header Authorization: Bearer {token}
+        
+        Il token JWT deve contenere i seguenti claim:
+        - iss: identificativo dell'ente emittente
+        - sub: identificativo dell'utente/sistema
+        - aud: identificativo dell'API
+        - exp: scadenza del token
+        - iat: timestamp di emissione
+
+  parameters:
+    limit:
+      name: limit
+      in: query
+      description: Numero massimo di elementi da restituire
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    
+    offset:
+      name: offset
+      in: query
+      description: Numero di elementi da saltare
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  headers:
+    X-Request-ID:
+      description: Identificativo univoco della richiesta per tracciamento
+      schema:
+        type: string
+        format: uuid
+      example: '7f3d02c4-7f9a-4f63-9c54-df90482b0e12'
+    
+    X-RateLimit-Limit:
+      description: Numero massimo di richieste per finestra temporale
+      schema:
+        type: integer
+      example: 1000
+    
+    X-RateLimit-Remaining:
+      description: Numero di richieste rimanenti nella finestra corrente
+      schema:
+        type: integer
+      example: 750
+
+  schemas:
+    # Schema base per errori RFC 7807
+    Problem:
+      type: object
+      required:
+        - status
+        - title
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI che identifica il tipo di problema
+          example: https://api.comune.example.gov.it/problems/validation-error
+        status:
+          type: integer
+          format: int32
+          description: Codice di stato HTTP
+          example: 400
+          minimum: 100
+          maximum: 599
+        title:
+          type: string
+          description: Titolo breve e leggibile del problema
+          example: Richiesta non valida
+        detail:
+          type: string
+          description: Spiegazione dettagliata del problema
+          example: Il campo 'codice-fiscale' non rispetta il formato previsto
+        instance:
+          type: string
+          format: uri
+          description: URI che identifica l'istanza specifica del problema
+          example: /documenti/550e8400-e29b-41d4-a716-446655440000
+
+    # Tipi enum
+    TipoDocumento:
+      type: string
+      description: Tipologia di documento amministrativo
+      enum:
+        - DELIBERA
+        - DETERMINA
+        - ORDINANZA
+        - DECRETO
+        - CIRCOLARE
+        - COMUNICAZIONE
+        - ALTRO
+      example: DELIBERA
+
+    StatoDocumento:
+      type: string
+      description: Stato del documento nel workflow
+      enum:
+        - BOZZA
+        - IN_APPROVAZIONE
+        - APPROVATO
+        - PUBBLICATO
+        - ARCHIVIATO
+        - ANNULLATO
+      example: PUBBLICATO
+
+    # Schema documento completo
+    Documento:
+      type: object
+      required:
+        - id
+        - tipo
+        - titolo
+        - stato
+        - data-creazione
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificativo univoco del documento
+          example: 550e8400-e29b-41d4-a716-446655440000
+        tipo:
+          $ref: '#/components/schemas/TipoDocumento'
+        titolo:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Titolo del documento
+          example: Delibera di Giunta n. 123 del 10/02/2024
+        descrizione:
+          type: string
+          maxLength: 2000
+          description: Descrizione estesa del documento
+          example: Approvazione del bilancio preventivo per l'anno 2024
+        numero-protocollo:
+          type: string
+          pattern: '^\d{4}/\d{7}$'
+          description: Numero di protocollo nel formato ANNO/NUMERO
+          example: '2024/0001234'
+        data-protocollo:
+          type: string
+          format: date-time
+          description: Data e ora di protocollazione (ISO 8601)
+          example: '2024-02-10T14:30:00Z'
+        stato:
+          $ref: '#/components/schemas/StatoDocumento'
+        ufficio-responsabile:
+          type: object
+          description: Ufficio responsabile del documento
+          required:
+            - codice
+            - nome
+          properties:
+            codice:
+              type: string
+              description: Codice identificativo dell'ufficio
+              example: URP-001
+            nome:
+              type: string
+              description: Nome dell'ufficio
+              example: Ufficio Relazioni con il Pubblico
+            ipa:
+              type: string
+              pattern: '^[a-z0-9_]+$'
+              description: Codice IPA dell'ente
+              example: comune_example
+        firmatari:
+          type: array
+          description: Lista dei firmatari del documento
+          items:
+            type: object
+            required:
+              - codice-fiscale
+              - nome
+              - cognome
+            properties:
+              codice-fiscale:
+                type: string
+                pattern: '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$'
+                description: Codice fiscale del firmatario
+                example: RSSMRA85M01H501U
+              nome:
+                type: string
+                example: Mario
+              cognome:
+                type: string
+                example: Rossi
+              ruolo:
+                type: string
+                example: Sindaco
+        classificazione:
+          type: object
+          description: Classificazione documentale
+          properties:
+            titolario:
+              type: string
+              description: Codice del titolario
+              example: I.4.2
+            descrizione:
+              type: string
+              description: Descrizione della classificazione
+              example: Personale - Assunzioni e cessazioni
+        oggetti-correlati:
+          type: array
+          description: Riferimenti ad altri documenti o pratiche
+          items:
+            type: object
+            properties:
+              tipo:
+                type: string
+                enum: [DOCUMENTO, PRATICA, PROCEDIMENTO]
+              id:
+                type: string
+                format: uuid
+              descrizione:
+                type: string
+        allegati-count:
+          type: integer
+          description: Numero di allegati associati
+          minimum: 0
+          example: 3
+        data-creazione:
+          type: string
+          format: date-time
+          description: Data e ora di creazione del documento
+          example: '2024-02-10T10:15:00Z'
+        data-modifica:
+          type: string
+          format: date-time
+          description: Data e ora ultima modifica
+          example: '2024-02-10T14:30:00Z'
+        utente-creazione:
+          type: string
+          description: Username dell'utente che ha creato il documento
+          example: m.rossi
+        utente-modifica:
+          type: string
+          description: Username dell'ultimo utente che ha modificato il documento
+          example: g.bianchi
+
+    # Schema per creazione documento
+    DocumentoCreate:
+      type: object
+      required:
+        - tipo
+        - titolo
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoDocumento'
+        titolo:
+          type: string
+          minLength: 1
+          maxLength: 500
+        descrizione:
+          type: string
+          maxLength: 2000
+        numero-protocollo:
+          type: string
+          pattern: '^\d{4}/\d{7}$'
+        data-protocollo:
+          type: string
+          format: date-time
+        ufficio-responsabile:
+          type: object
+          required:
+            - codice
+          properties:
+            codice:
+              type: string
+        classificazione:
+          type: object
+          properties:
+            titolario:
+              type: string
+
+    # Schema per aggiornamento documento
+    DocumentoUpdate:
+      type: object
+      properties:
+        titolo:
+          type: string
+          minLength: 1
+          maxLength: 500
+        descrizione:
+          type: string
+          maxLength: 2000
+        stato:
+          $ref: '#/components/schemas/StatoDocumento'
+        classificazione:
+          type: object
+          properties:
+            titolario:
+              type: string
+
+    # Collection di documenti con paginazione
+    DocumentiCollection:
+      type: object
+      required:
+        - items
+        - count
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Documento'
+        count:
+          type: integer
+          description: Numero totale di documenti
+          example: 150
+        limit:
+          type: integer
+          description: Limite di elementi per pagina
+          example: 20
+        offset:
+          type: integer
+          description: Offset corrente
+          example: 0
+
+    # Schema allegato
+    Allegato:
+      type: object
+      required:
+        - id
+        - nome
+        - mime-type
+        - dimensione
+        - data-upload
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 7f3d02c4-7f9a-4f63-9c54-df90482b0e12
+        nome:
+          type: string
+          maxLength: 255
+          example: delibera_123_2024.pdf
+        descrizione:
+          type: string
+          maxLength: 500
+          example: Testo integrale della delibera
+        mime-type:
+          type: string
+          example: application/pdf
+        dimensione:
+          type: integer
+          format: int64
+          description: Dimensione in bytes
+          example: 1024567
+        checksum-sha256:
+          type: string
+          description: Checksum SHA-256 del file
+          example: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        url-download:
+          type: string
+          format: uri
+          example: /documenti/550e8400-e29b-41d4-a716-446655440000/allegati/7f3d02c4-7f9a-4f63-9c54-df90482b0e12
+        data-upload:
+          type: string
+          format: date-time
+          example: '2024-02-10T14:45:00Z'
+        utente-upload:
+          type: string
+          example: m.rossi
+
+    # Criteri di ricerca
+    CriteriRicerca:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Testo di ricerca full-text
+          example: bilancio 2024
+        tipo:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipoDocumento'
+        stato:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatoDocumento'
+        data-da:
+          type: string
+          format: date
+        data-a:
+          type: string
+          format: date
+        ufficio:
+          type: string
+        classificazione:
+          type: string
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+
+    # Risultati ricerca
+    RisultatiRicerca:
+      type: object
+      properties:
+        risultati:
+          type: array
+          items:
+            $ref: '#/components/schemas/Documento'
+        totale:
+          type: integer
+          description: Numero totale di risultati trovati
+        tempo-ricerca-ms:
+          type: integer
+          description: Tempo impiegato per la ricerca in millisecondi
+        aggregazioni:
+          type: object
+          description: Aggregazioni dei risultati
+          properties:
+            per-tipo:
+              type: object
+              additionalProperties:
+                type: integer
+            per-stato:
+              type: object
+              additionalProperties:
+                type: integer
+
+    # Status del servizio
+    StatusResponse:
+      type: object
+      required:
+        - status
+        - version
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [OK, DEGRADED, DOWN]
+          description: Stato generale del servizio
+          example: OK
+        version:
+          type: string
+          description: Versione dell'API
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp della verifica
+          example: '2024-02-10T14:30:00Z'
+        checks:
+          type: object
+          description: Stato dei componenti individuali
+          additionalProperties:
+            type: string
+            enum: [OK, DEGRADED, DOWN]
+          example:
+            database: OK
+            storage: OK
+            search-engine: OK
+
+  responses:
+    BadRequest:
+      description: Richiesta non valida
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/validation-error
+            status: 400
+            title: Richiesta non valida
+            detail: Il campo 'titolo' è obbligatorio
+
+    Unauthorized:
+      description: Autenticazione richiesta
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer realm="API Documenti"
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/authentication-required
+            status: 401
+            title: Autenticazione richiesta
+            detail: Il token JWT non è presente o non è valido
+
+    Forbidden:
+      description: Accesso negato
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/authorization-failed
+            status: 403
+            title: Accesso negato
+            detail: L'utente non ha i permessi necessari per questa operazione
+
+    NotFound:
+      description: Risorsa non trovata
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/resource-not-found
+            status: 404
+            title: Risorsa non trovata
+            detail: Il documento con ID specificato non esiste
+
+    TooManyRequests:
+      description: Troppe richieste - rate limit superato
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          example: 0
+        Retry-After:
+          description: Secondi da attendere prima di riprovare
+          schema:
+            type: integer
+          example: 60
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/rate-limit-exceeded
+            status: 429
+            title: Troppe richieste
+            detail: Limite di 1000 richieste/ora superato. Riprovare tra 60 secondi.
+
+    InternalServerError:
+      description: Errore interno del server
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.comune.example.gov.it/problems/internal-error
+            status: 500
+            title: Errore interno
+            detail: Si è verificato un errore imprevisto. Contattare l'assistenza indicando l'ID richiesta.
+
+security:
+  - bearerAuth: []

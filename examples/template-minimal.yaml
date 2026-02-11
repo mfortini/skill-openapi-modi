@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: API Servizio Pubblico - Template Minimal
+  version: 1.0.0
+  description: |
+    Template minimale conforme ModI AgID per iniziare velocemente.
+    
+    Include solo gli elementi essenziali richiesti:
+    - Metadati obbligatori
+    - Security scheme
+    - Health check
+    - Gestione errori RFC 7807
+    
+    Usa questo template come punto di partenza, poi aggiungi le tue risorse.
+  
+  contact:
+    name: Ufficio Digitale
+    email: api@ente.gov.it
+    url: https://www.ente.gov.it
+  
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+  
+  x-api-id: ente-servizio-api
+  x-summary: Template minimal API conforme ModI AgID
+
+servers:
+  - url: https://api.ente.gov.it/servizio/v1
+    description: Produzione
+  - url: https://api-test.ente.gov.it/servizio/v1
+    description: Test
+
+tags:
+  - name: System
+    description: Operazioni di sistema
+
+paths:
+  /status:
+    get:
+      summary: Health check
+      description: Verifica stato del servizio
+      operationId: getStatus
+      tags:
+        - System
+      security: []  # Endpoint pubblico
+      responses:
+        '200':
+          description: Servizio operativo
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                status: OK
+                version: 1.0.0
+                timestamp: '2024-02-10T14:30:00Z'
+        '503':
+          description: Servizio non disponibile
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Autenticazione tramite token JWT.
+        Include nell'header: Authorization: Bearer {token}
+
+  headers:
+    X-Request-ID:
+      description: ID univoco richiesta per tracciamento
+      schema:
+        type: string
+        format: uuid
+      example: '550e8400-e29b-41d4-a716-446655440000'
+    
+    X-RateLimit-Limit:
+      description: Numero massimo richieste per finestra temporale
+      schema:
+        type: integer
+      example: 1000
+    
+    X-RateLimit-Remaining:
+      description: Richieste rimanenti
+      schema:
+        type: integer
+      example: 750
+
+  schemas:
+    # Schema obbligatorio per errori RFC 7807
+    Problem:
+      type: object
+      required:
+        - status
+        - title
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI che identifica il tipo di problema
+          example: https://api.ente.gov.it/problems/service-unavailable
+        status:
+          type: integer
+          format: int32
+          description: Codice HTTP
+          example: 503
+        title:
+          type: string
+          description: Titolo problema
+          example: Servizio temporaneamente non disponibile
+        detail:
+          type: string
+          description: Descrizione dettagliata
+          example: Il servizio è in manutenzione, riprovare tra 10 minuti
+        instance:
+          type: string
+          format: uri
+          description: URI istanza problema
+          example: /status
+    
+    StatusResponse:
+      type: object
+      required:
+        - status
+        - version
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [OK, DEGRADED, DOWN]
+          description: Stato servizio
+          example: OK
+        version:
+          type: string
+          description: Versione API
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp verifica
+          example: '2024-02-10T14:30:00Z'
+
+  responses:
+    BadRequest:
+      description: Richiesta non valida
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    Unauthorized:
+      description: Autenticazione richiesta
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    Forbidden:
+      description: Non autorizzato
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    NotFound:
+      description: Risorsa non trovata
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    TooManyRequests:
+      description: Troppe richieste
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          example: 0
+        Retry-After:
+          description: Secondi da attendere
+          schema:
+            type: integer
+          example: 60
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    
+    InternalServerError:
+      description: Errore interno
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+security:
+  - bearerAuth: []
+
+# PROSSIMI PASSI:
+# 1. Aggiungi i tuoi path sotto /paths
+# 2. Definisci gli schemi in /components/schemas
+# 3. Arricchisci con x-jsonld-* usando dati-semantic-mcp
+# 4. Valida con oas-checker-mcp

@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: API Anagrafe - Esempio con Annotazioni Semantiche
+  version: 1.0.0
+  description: |
+    Esempio di API con arricchimento semantico completo usando ontologie AgID.
+    
+    Questo esempio mostra come:
+    - Mappare schemi a classi ontologiche (x-jsonld-type)
+    - Definire context JSON-LD (x-jsonld-context)
+    - Utilizzare vocabolari controllati
+    - Referenziare ontologie italiane (CPV, CLV, COV) e standard (FOAF)
+
+    Le annotazioni permettono interoperabilità semantica e linked data.
+
+    NOTA: Le mappature in questo file sono state verificate il 2025-02-11
+    tramite MCP schema-gov-it. Verificare sempre le URI con inspect_concept()
+    o get_property_details() prima dell'uso in produzione.
+  
+  contact:
+    name: Ufficio Anagrafe
+    email: anagrafe@comune.example.gov.it
+  
+  x-api-id: comune-example-anagrafe-api
+  x-summary: API Anagrafe con annotazioni semantiche complete
+
+servers:
+  - url: https://api.comune.example.gov.it/anagrafe/v1
+
+paths:
+  /status:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  status: {type: string}
+                  version: {type: string}
+
+  /persone/{codice-fiscale}:
+    get:
+      summary: Recupera dati persona
+      parameters:
+        - name: codice-fiscale
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$'
+      responses:
+        '200':
+          description: Dati persona
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Persona'
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/Persona'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Persona con mappatura completa a ontologie
+    Persona:
+      type: object
+      description: |
+        Persona fisica conforme all'ontologia CPV (Core Vocabulary PA).
+        
+        Ontologia: https://w3id.org/italia/onto/CPV/Person
+        Standard: CPV (proprietà native givenName, familyName, dateOfBirth, ecc.)
+        Compatibile con: ANPR, SPID, CIE
+      
+      # Tipo ontologico
+      x-jsonld-type: 'https://w3id.org/italia/onto/CPV/Person'
+      
+      # Context JSON-LD per linked data
+      x-jsonld-context:
+        '@vocab': 'https://w3id.org/italia/onto/CPV/'
+        '@base': 'https://api.comune.example.gov.it/persone/'
+        CLV: 'https://w3id.org/italia/onto/CLV/'
+        foaf: 'http://xmlns.com/foaf/0.1/'
+        xsd: 'http://www.w3.org/2001/XMLSchema#'
+
+        # Mappature proprietà - verificate via MCP schema-gov-it 2025-02-11
+        id: '@id'
+        type: '@type'
+
+        codice-fiscale:
+          '@id': 'CPV:taxCode'
+          '@type': 'xsd:string'
+
+        nome:
+          '@id': 'CPV:givenName'  # DatatypeProperty, domain: CPV:Person, range: xsd:string
+          '@language': 'it'
+
+        cognome:
+          '@id': 'CPV:familyName'  # DatatypeProperty (Functional), domain: CPV:Person, range: xsd:string
+          '@language': 'it'
+
+        data-nascita:
+          '@id': 'CPV:dateOfBirth'  # DatatypeProperty (Functional), domain: CPV:Person, range: xsd:dateTime
+          '@type': 'xsd:date'
+
+        luogo-nascita:
+          '@id': 'CPV:hasBirthPlace'  # ObjectProperty, domain: CPV:Person, range: l0:Location
+          '@type': '@id'
+
+        residenza:
+          '@id': 'CPV:hasResidenceInTime'  # ObjectProperty, domain: CPV:Person, range: CPV:ResidenceInTime
+          '@type': '@id'
+
+        cittadinanza:
+          '@id': 'CPV:hasCitizenship'
+          '@type': '@id'
+
+        sesso:
+          '@id': 'CPV:hasSex'  # ObjectProperty, domain: CPV:Person, range: CPV:Sex
+          '@type': '@id'
+
+        # NOTA: stato-civile NON ha corrispondenza in CPV.
+        # CPV:hasMaritalStatus NON ESISTE nell'ontologia.
+        # Gap semantico: nessuna proprietà standard per stato civile in CPV.
+
+        email:
+          '@id': 'foaf:mbox'  # Gap CPV: nessuna proprietà email nativa. foaf:mbox come fallback.
+          '@type': 'xsd:string'
+
+        telefono:
+          '@id': 'foaf:phone'  # Gap CPV: nessuna proprietà telefono nativa. foaf:phone come fallback.
+          '@type': 'xsd:string'
+      
+      required:
+        - codice-fiscale
+        - nome
+        - cognome
+        - data-nascita
+      
+      properties:
+        id:
+          type: string
+          format: uri
+          readOnly: true
+          description: URI univoco della persona
+          example: 'https://api.comune.example.gov.it/persone/RSSMRA85M01H501U'
+        
+        codice-fiscale:
+          type: string
+          pattern: '^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$'
+          description: Codice fiscale italiano
+          example: 'RSSMRA85M01H501U'
+        
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Nome di battesimo
+          example: 'Mario'
+        
+        cognome:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Cognome
+          example: 'Rossi'
+        
+        data-nascita:
+          type: string
+          format: date
+          description: Data di nascita (ISO 8601)
+          example: '1985-08-01'
+        
+        luogo-nascita:
+          $ref: '#/components/schemas/Comune'
+        
+        residenza:
+          $ref: '#/components/schemas/Indirizzo'
+        
+        cittadinanza:
+          type: string
+          description: |
+            Codice ISO 3166-1 alpha-2 della nazione.
+            Vocabolario: https://www.iso.org/iso-3166-country-codes.html
+          pattern: '^[A-Z]{2}$'
+          example: 'IT'
+        
+        sesso:
+          type: string
+          description: |
+            Sesso biologico.
+            Vocabolario controllato ISO/IEC 5218
+          enum:
+            - M  # Maschio
+            - F  # Femmina
+            - X  # Non specificato
+          example: 'M'
+        
+        stato-civile:
+          type: string
+          description: |
+            Stato civile secondo classificazione ISTAT.
+            GAP SEMANTICO: CPV:hasMaritalStatus NON esiste nell'ontologia CPV.
+            Nessuna proprietà standard trovata. Mappatura ontologica assente.
+          enum:
+            - CELIBE_NUBILE
+            - CONIUGATO
+            - DIVORZIATO
+            - VEDOVO
+            - UNIONE_CIVILE
+            - UNIONE_CIVILE_SCIOLTA
+          example: 'CELIBE_NUBILE'
+        
+        email:
+          type: string
+          format: email
+          description: Indirizzo email
+          example: 'mario.rossi@example.com'
+        
+        telefono:
+          type: string
+          pattern: '^\+?[0-9\s\-\(\)]+$'
+          description: Numero telefono con prefisso internazionale
+          example: '+39 345 1234567'
+
+    # Indirizzo con ontologia CLV (Core Location Vocabulary)
+    Indirizzo:
+      type: object
+      description: |
+        Indirizzo conforme all'ontologia CLV.
+        
+        Ontologia: https://w3id.org/italia/onto/CLV/Address
+      
+      x-jsonld-type: 'https://w3id.org/italia/onto/CLV/Address'
+      
+      x-jsonld-context:
+        '@vocab': 'https://w3id.org/italia/onto/CLV/'
+        # Mappature verificate via MCP schema-gov-it 2025-02-11
+        via: 'CLV:fullAddress'  # DatatypeProperty (Functional), domain: CLV:Address, range: Literal
+        numero-civico:
+          '@id': 'CLV:hasNumber'  # ObjectProperty, domain: CLV:Address, range: CLV:CivicNumbering
+          '@type': '@id'
+        # NOTA: CLV:postCode NON ESISTE nell'ontologia CLV.
+        # GAP SEMANTICO: nessuna proprietà standard per CAP.
+        # cap: non mappato (gap)
+        comune:
+          '@id': 'CLV:hasCity'  # ObjectProperty, domain: CLV:Address, range: CLV:City
+          '@type': '@id'
+        provincia:
+          '@id': 'CLV:hasProvince'  # ObjectProperty, domain: CLV:Address, range: CLV:Province (NON stringa)
+          '@type': '@id'
+        regione:
+          '@id': 'CLV:hasRegion'  # ObjectProperty, domain: CLV:Address, range: CLV:Region (NON stringa)
+          '@type': '@id'
+        coordinate:
+          '@id': 'CLV:hasGeometry'
+          '@type': '@id'
+
+      required:
+        - via
+        - comune
+        - cap
+      
+      properties:
+        via:
+          type: string
+          description: Nome della via completo
+          example: 'Via Roma'
+        
+        numero-civico:
+          type: string
+          description: |
+            Numero civico (con eventuali subalterni).
+            NOTA: CLV:hasNumber è una ObjectProperty con range CLV:CivicNumbering,
+            non un semplice valore stringa. In questa rappresentazione semplificata
+            si usa il valore testuale del numero civico.
+          example: '123/A'
+
+        cap:
+          type: string
+          pattern: '^\d{5}$'
+          description: |
+            Codice Avviamento Postale.
+            GAP SEMANTICO: CLV:postCode NON esiste nell'ontologia CLV.
+            Nessuna proprietà standard trovata per il CAP.
+          example: '00100'
+        
+        comune:
+          $ref: '#/components/schemas/Comune'
+        
+        provincia:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          description: |
+            Sigla provincia (2 caratteri).
+            Vocabolario: Codici ISTAT province italiane.
+            NOTA: CLV:hasProvince è una ObjectProperty con range CLV:Province.
+            In questa rappresentazione semplificata si usa la sigla come stringa.
+          example: 'RM'
+
+        regione:
+          type: string
+          description: |
+            Nome regione.
+            NOTA: CLV:hasRegion è una ObjectProperty con range CLV:Region.
+            In questa rappresentazione semplificata si usa il nome come stringa.
+          example: 'Lazio'
+        
+        coordinate:
+          $ref: '#/components/schemas/Coordinate'
+
+    # Comune
+    Comune:
+      type: object
+      description: Comune italiano con codice ISTAT
+      
+      x-jsonld-type: 'https://w3id.org/italia/onto/CLV/City'
+      
+      x-jsonld-context:
+        '@vocab': 'https://w3id.org/italia/onto/CLV/'
+        rdfs: 'http://www.w3.org/2000/01/rdf-schema#'
+        skos: 'http://www.w3.org/2004/02/skos/core#'
+        # Mappature verificate via MCP schema-gov-it 2025-02-11
+        nome: 'rdfs:label'  # CLV:cityName NON ESISTE. Usare rdfs:label o skos:prefLabel.
+        codice-istat:
+          '@id': 'CLV:hasIdentifier'  # ObjectProperty, domain: CLV:SpatialObject, range: CLV:Identifier
+          '@type': '@id'
+          # NOTA: CLV:code NON ESISTE. CLV:hasIdentifier è una ObjectProperty
+          # che lega un SpatialObject a un Identifier. In questa
+          # rappresentazione semplificata si usa il valore ISTAT direttamente.
+        provincia:
+          '@id': 'CLV:hasProvince'  # ObjectProperty, range: CLV:Province
+          '@type': '@id'
+      
+      required:
+        - nome
+        - codice-istat
+      
+      properties:
+        nome:
+          type: string
+          description: |
+            Nome del comune.
+            Mappato a rdfs:label (CLV:cityName NON esiste nell'ontologia CLV).
+          example: 'Roma'
+
+        codice-istat:
+          type: string
+          pattern: '^\d{6}$'
+          description: |
+            Codice ISTAT del comune (6 cifre).
+            Vocabolario: https://www.istat.it/it/archivio/6789
+            NOTA: CLV:code NON esiste. Mappato a CLV:hasIdentifier (ObjectProperty
+            con range CLV:Identifier). Qui si usa il valore diretto come semplificazione.
+          example: '058091'
+
+        provincia:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          description: |
+            Sigla provincia.
+            NOTA: CLV:hasProvince è ObjectProperty con range CLV:Province.
+          example: 'RM'
+
+    # Coordinate geografiche
+    Coordinate:
+      type: object
+      description: Coordinate geografiche WGS84
+      
+      x-jsonld-type: 'http://www.w3.org/2003/01/geo/wgs84_pos#Point'
+      
+      x-jsonld-context:
+        geo: 'http://www.w3.org/2003/01/geo/wgs84_pos#'
+        latitudine: 'geo:lat'
+        longitudine: 'geo:long'
+      
+      required:
+        - latitudine
+        - longitudine
+      
+      properties:
+        latitudine:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          description: Latitudine decimale (WGS84)
+          example: 41.9028
+        
+        longitudine:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          description: Longitudine decimale (WGS84)
+          example: 12.4964
+
+    Problem:
+      type: object
+      required: [status, title]
+      properties:
+        type: {type: string, format: uri}
+        status: {type: integer}
+        title: {type: string}
+        detail: {type: string}
+
+security:
+  - bearerAuth: []
+
+# NOTE IMPLEMENTATIVE:
+#
+# 1. Content Negotiation per JSON-LD
+#    - application/json: risposta OpenAPI standard
+#    - application/ld+json: risposta con context JSON-LD espanso
+#
+# 2. Validazione Ontologie
+#    Prima del deployment, valida le mappature con dati-semantic-mcp:
+#    - Verifica che gli URI ontologie esistano
+#    - Controlla coerenza proprietà con classi
+#    - Valida vocabolari controllati
+#
+# 3. Documentazione Linked Data
+#    Ogni response può includere link a definizioni ontologie:
+#    Link: <https://w3id.org/italia/onto/CPV/>; rel="describedby"
+#
+# 4. Estensioni Future
+#    - Aggiungere supporto RDF/XML
+#    - SPARQL endpoint per query semantiche
+#    - Allineamento con Knowledge Graph nazionale
