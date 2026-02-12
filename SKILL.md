@@ -117,22 +117,52 @@ FASE 5: ITERAZIONE
 → Raffina annotazioni semantiche
 
 FASE 6: GENERAZIONE ESEMPI JSON-LD
-→ Per ogni schema con annotazioni x-jsonld-*, genera due file nella cartella jsonld/:
+→ SOLO per schemi con x-jsonld-context contenente mappature di proprietà, genera:
   - {schema}.json: Risposta JSON standard (application/json)
   - {schema}.jsonld: Risposta JSON-LD con @context espanso (application/ld+json)
+→ NON generare file .jsonld per schemi senza x-jsonld-context
 → Il @context nel file .jsonld DEVE includere tutti i prefissi e mappature
-→ Se lo schema NON ha mappature semantiche, usare @context vuoto: {}
 → I file devono essere validi JSON e validabili con tool JSON-LD
 → Documentare gap semantici: proprietà nel .json che non appaiono nel .jsonld
 
-FASE 6.5: VALIDAZIONE ESEMPI JSON-LD
-→ Validare OGNI file .jsonld con tool JSON-LD lint
-→ Comandi di validazione:
-  - jsonld-cli: `jsonld format file.jsonld` (verifica parsing)
-  - Python pyld: `python -c "from pyld import jsonld; import json; jsonld.expand(json.load(open('file.jsonld')))"`
-  - Online: https://json-ld.org/playground/
-→ Verificare che l'espansione produca URI valide
-→ Segnalare errori di sintassi o prefissi non definiti
+FASE 6.5: VALIDAZIONE ESEMPI JSON-LD (eseguire via Bash)
+→ Installare pyld se non presente: pip install pyld
+→ Eseguire lo script di validazione nella cartella jsonld/:
+
+```bash
+# Creare venv se non esiste e installare pyld
+test -d jsonld/.venv || (python3 -m venv jsonld/.venv && jsonld/.venv/bin/pip install -q pyld)
+
+cd jsonld/ && .venv/bin/python3 -c "
+from pyld import jsonld
+import json, glob, sys
+errors = 0
+for f in sorted(glob.glob('*.jsonld')):
+    try:
+        with open(f) as fh:
+            doc = json.load(fh)
+        if '@context' not in doc:
+            # Cerca context annidati (schemi compositi)
+            has_nested = any('@context' in v for v in doc.values() if isinstance(v, dict))
+            if not has_nested:
+                print(f'SKIP {f}: nessun @context (non e JSON-LD)')
+                continue
+        expanded = jsonld.expand(doc)
+        # Verifica che l'espansione produca URI (non stringhe nude)
+        n_triples = sum(len(node.keys()) - (1 if '@type' in node else 0) for node in expanded) if expanded else 0
+        print(f'OK   {f} ({len(expanded)} nodi, ~{n_triples} proprieta espanse)')
+    except json.JSONDecodeError as e:
+        print(f'ERR  {f}: JSON non valido - {e}')
+        errors += 1
+    except Exception as e:
+        print(f'ERR  {f}: {e}')
+        errors += 1
+sys.exit(1 if errors else 0)
+"
+```
+
+→ Output atteso: OK per ogni file, ERR se ci sono problemi
+→ Se pyld non e' installabile, validare online: https://json-ld.org/playground/
 
 FASE 7: GENERAZIONE LOG.md
 → Genera LOG.md nella stessa directory del file OpenAPI
@@ -518,29 +548,33 @@ Il contesto JSON-LD mappa le proprietà a URI di ontologie. **Usare SEMPRE prefi
 3. Impostare `@base` sull'URL base delle risorse
 4. Mappare ogni proprietà con notazione `prefisso:nome`
 5. **Mai inserire URI complete** nelle mappature delle proprietà
-6. **@context vuoto**: Se non ci sono mappature semantiche, usare `"@context": {}`
+6. **Schemi senza semantica**: NON aggiungere `x-jsonld-context`. Usare un commento YAML per documentare il motivo.
+7. **Context con soli prefissi**: NON aggiungere `x-jsonld-context` se contiene solo prefissi senza mappature di proprietà. I prefissi servono solo se usati per mappare qualcosa.
 
-**REGOLA CRITICA - @context vuoto per schemi senza semantica**:
-Quando uno schema non ha corrispondenze ontologiche (es. `/status`, errori generici, metriche tecniche), il `@context` DEVE essere un oggetto vuoto `{}`. **Mai omettere @context**, altrimenti il JSON-LD non è valido.
+**REGOLA - Schemi senza corrispondenza ontologica**:
+Quando uno schema non ha corrispondenze ontologiche (es. `/status`, errori generici, metriche tecniche, wrapper di collezione), **NON aggiungere `x-jsonld-context`**. Documentare l'assenza con un commento YAML:
 
 ```yaml
-# Schema SENZA semantica mappabile - USARE @context vuoto
+# x-jsonld: nessuna corrispondenza ontologica (schema tecnico/infrastrutturale)
 StatusResponse:
   type: object
-  x-jsonld-context: {}  # Context vuoto - valido JSON-LD
   properties:
     status: {type: string}
     version: {type: string}
     uptime: {type: integer}
 ```
 
-Il JSON-LD risultante sarà:
-```json
-{
-  "@context": {},
-  "status": "healthy",
-  "version": "1.0.0"
-}
+Per schemi contenitore che raggruppano sotto-schemi tramite `$ref`, NON aggiungere un context con soli prefissi. La semantica e' definita nei sotto-schemi:
+
+```yaml
+# x-jsonld: contenitore API, semantica delegata ai sotto-schemi
+IscrizioneAlbo:
+  type: object
+  properties:
+    professionista:
+      $ref: '#/components/schemas/ProfessionistaSanitario'  # ha x-jsonld-context
+    iscrizione:
+      $ref: '#/components/schemas/DettaglioIscrizione'      # ha x-jsonld-context
 ```
 
 ```yaml
@@ -2262,14 +2296,16 @@ Per ogni specifica OpenAPI, creare una cartella `jsonld/` con i file di esempio:
 ```
 api-spec.yaml
 jsonld/
-├── README.md           # Documentazione mappature
+├── README.md           # Documentazione mappature e gap semantici
 ├── persona.json        # Risposta JSON standard
 ├── persona.jsonld      # Risposta JSON-LD con @context
 ├── documento.json
-├── documento.jsonld
-├── status.json         # Schema senza semantica
-└── status.jsonld       # Con @context vuoto
+└── documento.jsonld
 ```
+
+**NOTA**: Generare file `.jsonld` SOLO per schemi che hanno `x-jsonld-context` con mappature
+di proprietà. Per schemi senza semantica (es. StatusResponse, Problem, wrapper di collezione)
+generare solo il `.json` di esempio, senza `.jsonld`.
 
 ### Regole di generazione
 
@@ -2309,63 +2345,66 @@ File `.jsonld` (application/ld+json):
 
 **NOTA**: Le proprietà senza mappatura semantica (es. `stato-civile`) NON appaiono nel file `.jsonld`. Documentare questi gap nel README.
 
-**2. Per schemi SENZA mappature semantiche (x-jsonld-context vuoto):**
+**2. Per schemi SENZA mappature semantiche:**
 
-```json
-{
-  "@context": {},
-  "status": "healthy",
-  "version": "1.0.0"
-}
+Non generare file `.jsonld`. Generare solo il file `.json` di esempio.
+Per documentare l'assenza di mappatura, aggiungere un commento YAML nello schema OpenAPI:
+
+```yaml
+# x-jsonld: nessuna corrispondenza ontologica (schema tecnico/infrastrutturale)
+StatusResponse:
+  type: object
+  properties:
+    status: {type: string}
 ```
-
-**REGOLA CRITICA**: Mai omettere `@context`. Usare oggetto vuoto `{}` per schemi senza semantica.
 
 ### Validazione JSON-LD
 
-Validare OGNI file `.jsonld` prima del commit. Usare uno dei seguenti tool:
+Validare OGNI file `.jsonld` prima del commit.
 
-**1. jsonld-cli (Node.js) - RACCOMANDATO**
+**Script di validazione batch (Python pyld) - RACCOMANDATO**
 
-```bash
-# Installazione
-npm install -g jsonld-cli
-
-# Validazione formato
-jsonld format persona.jsonld
-
-# Espansione (verifica URI)
-jsonld expand persona.jsonld
-
-# Compattazione con context esterno
-jsonld compact -c context.jsonld persona.jsonld
-```
-
-**2. pyld (Python)**
+Questo script puo essere eseguito direttamente da Claude via Bash:
 
 ```bash
-# Installazione
-pip install pyld
+# Creare venv se non esiste e installare pyld (una tantum)
+test -d jsonld/.venv || (python3 -m venv jsonld/.venv && jsonld/.venv/bin/pip install -q pyld)
 
-# Script di validazione
-python << 'EOF'
+# Validazione batch di tutti i file .jsonld nella cartella
+cd jsonld/ && .venv/bin/python3 -c "
 from pyld import jsonld
-import json
-import sys
-
-try:
-    with open('persona.jsonld') as f:
-        doc = json.load(f)
-    expanded = jsonld.expand(doc)
-    print("✓ JSON-LD valido")
-    print(f"  Espanso in {len(expanded)} nodi")
-except Exception as e:
-    print(f"✗ Errore: {e}")
-    sys.exit(1)
-EOF
+import json, glob, sys
+errors = 0
+for f in sorted(glob.glob('*.jsonld')):
+    try:
+        with open(f) as fh:
+            doc = json.load(fh)
+        if '@context' not in doc:
+            has_nested = any('@context' in v for v in doc.values() if isinstance(v, dict))
+            if not has_nested:
+                print(f'SKIP {f}: nessun @context (non e JSON-LD)')
+                continue
+        expanded = jsonld.expand(doc)
+        n_triples = sum(len(node.keys()) - (1 if '@type' in node else 0) for node in expanded) if expanded else 0
+        print(f'OK   {f} ({len(expanded)} nodi, ~{n_triples} proprieta espanse)')
+    except json.JSONDecodeError as e:
+        print(f'ERR  {f}: JSON non valido - {e}')
+        errors += 1
+    except Exception as e:
+        print(f'ERR  {f}: {e}')
+        errors += 1
+sys.exit(1 if errors else 0)
+"
 ```
 
-**3. JSON-LD Playground (online)**
+**Output atteso:**
+```
+OK   dettaglio-iscrizione.jsonld (1 nodi, ~2 proprieta espanse)
+OK   iscrizione-albo.jsonld (2 nodi, ~6 proprieta espanse)
+OK   professionista-sanitario.jsonld (1 nodi, ~4 proprieta espanse)
+```
+
+**Alternativa: JSON-LD Playground (online)**
 
 - URL: https://json-ld.org/playground/
 - Incollare il contenuto del file `.jsonld`
@@ -2376,21 +2415,24 @@ EOF
 
 Per ogni file `.jsonld`:
 
+- [ ] File `.jsonld` generati SOLO per schemi con `x-jsonld-context` con mappature reali
 - [ ] Il file è JSON valido (nessun errore di sintassi)
-- [ ] `@context` è presente (anche se vuoto `{}`)
+- [ ] `@context` è presente e contiene mappature di proprietà (mai vuoto)
 - [ ] Tutti i prefissi usati sono definiti nel context
 - [ ] L'espansione produce URI valide (non literal con prefisso non risolto)
 - [ ] `@type` è presente per le entità principali
 - [ ] Gap semantici documentati nel README
+- [ ] Schemi senza semantica hanno commento YAML `# x-jsonld:` nello YAML (senza `.jsonld`)
 
 ### Errori comuni
 
 | Errore | Causa | Soluzione |
 |--------|-------|-----------|
 | `undefined:property` nell'espansione | Prefisso non definito | Aggiungere prefisso al @context |
-| `@context` mancante | File non è JSON-LD valido | Aggiungere `"@context": {}` |
+| `@context` mancante | File non è JSON-LD valido | Aggiungere `@context` con mappature (non generare `.jsonld` per schemi senza semantica) |
 | URI non espanse | Prefisso con errore di battitura | Verificare spelling prefissi |
 | `@vocab` non funziona | Sintassi errata | Usare formato `"@vocab": "https://..."` |
+| Context con soli prefissi | Nessuna proprietà mappata | Non aggiungere `x-jsonld-context` se non ci sono mappature di proprietà |
 
 ## Registro Correzioni Semantiche
 
