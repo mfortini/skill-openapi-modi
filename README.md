@@ -1,4 +1,4 @@
-# Skill: Generazione Specifiche OpenAPI Conformi alle Linee Guida AgID
+# (WIP) Skill: Generazione Specifiche OpenAPI Conformi alle Linee Guida AgID
 
 ## Panoramica
 
