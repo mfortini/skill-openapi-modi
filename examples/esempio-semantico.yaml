@@ -81,13 +81,15 @@ components:
         Standard: CPV (proprietà native givenName, familyName, dateOfBirth, ecc.)
         Compatibile con: ANPR, SPID, CIE
       
-      # Tipo ontologico
-      x-jsonld-type: 'https://w3id.org/italia/onto/CPV/Person'
+      # Tipo ontologico - usare prefisso compatto
+      x-jsonld-type: 'CPV:Person'
       
       # Context JSON-LD per linked data
       x-jsonld-context:
         '@vocab': 'https://w3id.org/italia/onto/CPV/'
         '@base': 'https://api.comune.example.gov.it/persone/'
+        # Prefissi - DEVONO essere definiti qui per usarli in x-jsonld-type
+        CPV: 'https://w3id.org/italia/onto/CPV/'
         CLV: 'https://w3id.org/italia/onto/CLV/'
         foaf: 'http://xmlns.com/foaf/0.1/'
         xsd: 'http://www.w3.org/2001/XMLSchema#'
@@ -240,10 +242,11 @@ components:
         
         Ontologia: https://w3id.org/italia/onto/CLV/Address
       
-      x-jsonld-type: 'https://w3id.org/italia/onto/CLV/Address'
+      x-jsonld-type: 'CLV:Address'
       
       x-jsonld-context:
         '@vocab': 'https://w3id.org/italia/onto/CLV/'
+        CLV: 'https://w3id.org/italia/onto/CLV/'
         # Mappature verificate via MCP schema-gov-it 2025-02-11
         via: 'CLV:fullAddress'  # DatatypeProperty (Functional), domain: CLV:Address, range: Literal
         numero-civico:
@@ -323,10 +326,11 @@ components:
       type: object
       description: Comune italiano con codice ISTAT
       
-      x-jsonld-type: 'https://w3id.org/italia/onto/CLV/City'
+      x-jsonld-type: 'CLV:City'
       
       x-jsonld-context:
         '@vocab': 'https://w3id.org/italia/onto/CLV/'
+        CLV: 'https://w3id.org/italia/onto/CLV/'
         rdfs: 'http://www.w3.org/2000/01/rdf-schema#'
         skos: 'http://www.w3.org/2004/02/skos/core#'
         # Mappature verificate via MCP schema-gov-it 2025-02-11
@@ -376,7 +380,7 @@ components:
       type: object
       description: Coordinate geografiche WGS84
       
-      x-jsonld-type: 'http://www.w3.org/2003/01/geo/wgs84_pos#Point'
+      x-jsonld-type: 'geo:Point'
       
       x-jsonld-context:
         geo: 'http://www.w3.org/2003/01/geo/wgs84_pos#'

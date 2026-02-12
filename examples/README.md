@@ -353,6 +353,6 @@ Hai creato un esempio interessante? Condividilo!
 
 ---
 
-**Versione Examples**: 1.0  
-**Ultimo aggiornamento**: Febbraio 2024  
+**Versione Examples**: 1.1
+**Ultimo aggiornamento**: Febbraio 2025
 **Conformità**: ModI AgID - Linee Guida v1.2

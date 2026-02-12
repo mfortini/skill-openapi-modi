@@ -1,4 +1,5 @@
 {
+  "_comment": "Risposta JSON standard - alcune proprietà non hanno mappatura ontologica (vedi documento.jsonld)",
   "id": "https://api.comune.example.gov.it/documenti/DOC-2025-001234",
   "identificativo": "DOC-2025-001234",
   "titolo": "Autorizzazione edilizia",

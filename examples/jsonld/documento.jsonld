@@ -33,6 +33,8 @@
     }
   },
 
+  "_gap_semantici": "NOTA: 'stato' (PUBBLICATO) presente nel JSON originale ma escluso da JSON-LD - nessuna mappatura ontologica trovata per lo stato del documento. Possibili alternative: dct:status (non standard), schema:status, o vocabolario custom.",
+
   "@type": "dcat:Dataset",
   "id": "https://api.comune.example.gov.it/documenti/DOC-2025-001234",
   "identificativo": "DOC-2025-001234",

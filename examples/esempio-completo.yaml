@@ -170,6 +170,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentiCollection'
+              example:
+                items:
+                  - id: 550e8400-e29b-41d4-a716-446655440000
+                    tipo: DELIBERA
+                    titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico"
+                    descrizione: "Approvazione del piano urbanistico per la zona nord"
+                    numero-protocollo: "2024/0004521"
+                    data-protocollo: "2024-03-15T09:00:00Z"
+                    stato: PUBBLICATO
+                    ufficio-responsabile:
+                      codice: URB-003
+                      nome: Ufficio Urbanistica
+                    allegati-count: 3
+                    data-creazione: "2024-03-15T09:00:12Z"
+                    data-modifica: "2024-03-20T11:30:00Z"
+                  - id: 660f9511-f30c-52e5-b827-557766551111
+                    tipo: DETERMINA
+                    titolo: "Determina n. 123/2024 - Affidamento servizio mensa"
+                    descrizione: "Affidamento diretto del servizio mensa scolastica"
+                    numero-protocollo: "2024/0004522"
+                    data-protocollo: "2024-03-14T11:30:00Z"
+                    stato: BOZZA
+                    ufficio-responsabile:
+                      codice: IST-001
+                      nome: Ufficio Istruzione
+                    allegati-count: 1
+                    data-creazione: "2024-03-14T11:30:00Z"
+                count: 42
+                limit: 20
+                offset: 0
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -191,6 +221,31 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DocumentoCreate'
+            examples:
+              delibera:
+                summary: Creazione delibera di giunta
+                value:
+                  tipo: DELIBERA
+                  titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico"
+                  descrizione: "Approvazione del piano urbanistico per la zona nord del territorio comunale"
+                  numero-protocollo: "2024/0004521"
+                  data-protocollo: "2024-03-15T09:00:00Z"
+                  ufficio-responsabile:
+                    codice: URB-003
+                  classificazione:
+                    titolario: "VI.1.2"
+              determina:
+                summary: Creazione determina dirigenziale
+                value:
+                  tipo: DETERMINA
+                  titolo: "Determina n. 123/2024 - Affidamento servizio mensa"
+                  descrizione: "Affidamento diretto del servizio mensa scolastica anno 2024/2025"
+                  numero-protocollo: "2024/0004522"
+                  data-protocollo: "2024-03-15T10:30:00Z"
+                  ufficio-responsabile:
+                    codice: IST-001
+                  classificazione:
+                    titolario: "VII.2.1"
       responses:
         '201':
           description: Documento creato con successo
@@ -207,6 +262,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Documento'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                tipo: DELIBERA
+                titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico"
+                descrizione: "Approvazione del piano urbanistico per la zona nord del territorio comunale"
+                numero-protocollo: "2024/0004521"
+                data-protocollo: "2024-03-15T09:00:00Z"
+                stato: BOZZA
+                ufficio-responsabile:
+                  codice: URB-003
+                  nome: Ufficio Urbanistica
+                  ipa: comune_example
+                classificazione:
+                  titolario: "VI.1.2"
+                  descrizione: "Urbanistica - Piani regolatori"
+                allegati-count: 0
+                data-creazione: "2024-03-15T09:00:12Z"
+                utente-creazione: m.bianchi
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -279,6 +352,12 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DocumentoUpdate'
+            example:
+              titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico (rev. 2)"
+              descrizione: "Approvazione del piano urbanistico per la zona nord - versione aggiornata con integrazioni"
+              stato: IN_APPROVAZIONE
+              classificazione:
+                titolario: "VI.1.2"
       responses:
         '200':
           description: Documento aggiornato con successo
@@ -293,6 +372,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Documento'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                tipo: DELIBERA
+                titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico (rev. 2)"
+                descrizione: "Approvazione del piano urbanistico per la zona nord - versione aggiornata con integrazioni"
+                numero-protocollo: "2024/0004521"
+                data-protocollo: "2024-03-15T09:00:00Z"
+                stato: IN_APPROVAZIONE
+                ufficio-responsabile:
+                  codice: URB-003
+                  nome: Ufficio Urbanistica
+                  ipa: comune_example
+                classificazione:
+                  titolario: "VI.1.2"
+                  descrizione: "Urbanistica - Piani regolatori"
+                allegati-count: 2
+                data-creazione: "2024-03-15T09:00:12Z"
+                data-modifica: "2024-03-16T14:22:00Z"
+                utente-creazione: m.bianchi
+                utente-modifica: g.verdi
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -508,6 +607,19 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CriteriRicerca'
+            example:
+              query: "piano urbanistico"
+              tipo:
+                - DELIBERA
+                - DETERMINA
+              stato:
+                - PUBBLICATO
+                - APPROVATO
+              data-da: "2024-01-01"
+              data-a: "2024-12-31"
+              ufficio: URB-003
+              limit: 20
+              offset: 0
       responses:
         '200':
           description: Risultati della ricerca
@@ -518,6 +630,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RisultatiRicerca'
+              example:
+                risultati:
+                  - id: 550e8400-e29b-41d4-a716-446655440000
+                    tipo: DELIBERA
+                    titolo: "Delibera di Giunta n. 45/2024 - Approvazione piano urbanistico"
+                    stato: PUBBLICATO
+                    data-creazione: "2024-03-15T09:00:12Z"
+                  - id: 770a0622-a41d-63f6-c938-668877662222
+                    tipo: DELIBERA
+                    titolo: "Delibera di Giunta n. 12/2024 - Variante piano urbanistico zona est"
+                    stato: APPROVATO
+                    data-creazione: "2024-02-10T10:15:00Z"
+                totale: 2
+                tempo-ricerca-ms: 45
+                aggregazioni:
+                  per-tipo:
+                    DELIBERA: 2
+                  per-stato:
+                    PUBBLICATO: 1
+                    APPROVATO: 1
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

@@ -97,6 +97,7 @@ components:
 
   schemas:
     # Schema obbligatorio per errori RFC 7807
+    # x-jsonld: nessuna corrispondenza ontologica (schema tecnico/infrastrutturale per gestione errori)
     Problem:
       type: object
       required:
@@ -127,6 +128,7 @@ components:
           description: URI istanza problema
           example: /status
     
+    # x-jsonld: nessuna corrispondenza ontologica (schema tecnico/infrastrutturale per health check)
     StatusResponse:
       type: object
       required:

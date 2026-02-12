@@ -44,6 +44,9 @@ Esempio di documento amministrativo usando Dublin Core e DCAT.
 - `data-modifica` → `dct:modified`
 - `autore` → `dct:creator` (con nested `COV:Organization`)
 
+**Gap semantici documentati:**
+- `stato`: presente in JSON ma escluso da JSON-LD (nessuna mappatura ontologica standard trovata - possibili alternative: dct:status, schema:status)
+
 ### status.json / status.jsonld
 
 Esempio di risposta senza elementi semantici mappabili.

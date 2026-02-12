@@ -614,13 +614,16 @@ components:
 
 #### x-jsonld-type - Tipo Semantico
 
-Specifica il tipo ontologico dell'entità:
+Specifica il tipo ontologico dell'entità.
+
+> **IMPORTANTE**: Se `x-jsonld-type` usa un prefisso compatto (es. `CPV:Person`), il prefisso **DEVE** essere definito nel `x-jsonld-context` dello stesso schema. Il prefisso deve espandere correttamente la URI.
 
 ```yaml
 Documento:
   type: object
   x-jsonld-type: 'dcat:Dataset'
   x-jsonld-context:
+    dcat: 'http://www.w3.org/ns/dcat#'  # OBBLIGATORIO: definire il prefisso usato in x-jsonld-type
     '@vocab': 'https://w3id.org/italia/onto/CPV/'
   properties:
     # ...
@@ -629,6 +632,7 @@ Persona:
   type: object
   x-jsonld-type: 'CPV:Person'  # Usare CPV:Person per contesto PA italiana
   x-jsonld-context:
+    # OBBLIGATORIO: definire TUTTI i prefissi usati in x-jsonld-type e nelle mappature
     CPV: 'https://w3id.org/italia/onto/CPV/'
     foaf: 'http://xmlns.com/foaf/0.1/'
     nome: 'CPV:givenName'     # proprietà nativa CPV (NON foaf:firstName)
@@ -641,7 +645,7 @@ Persona:
 
 Organizzazione:
   type: object
-  x-jsonld-type: 'http://www.w3.org/ns/org#Organization'
+  x-jsonld-type: 'http://www.w3.org/ns/org#Organization'  # URI completa: nessun prefisso da definire
   properties:
     nome: {type: string}
     codice-ipa: {type: string}
@@ -1482,6 +1486,7 @@ Prima di pubblicare la specifica, verificare:
 - [ ] `@vocab` definito per il namespace dominante di ogni schema
 - [ ] `@base` definito per le URI delle risorse dell'API
 - [ ] Ogni schema principale ha `x-jsonld-type` con prefisso
+- [ ] **Prefissi usati in `x-jsonld-type` definiti nel `x-jsonld-context`** (es. se `x-jsonld-type: 'CPV:Person'`, deve esistere `CPV: 'https://...'` nel context)
 - [ ] Domain/range di ogni proprietà verificati come compatibili con lo schema
 - [ ] Gap semantici segnalati con nota nelle description
 - [ ] Proprietà senza mappatura ontologica documentate con suggerimento alternativo
